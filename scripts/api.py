@@ -26,44 +26,50 @@ def text2video_api(_: gr.Blocks, app: FastAPI):
         fps: int = Body(24, title='FPS for inference'),
     ):
         print(f"text2video called: \
-              prompt: {prompt} \n \
-              negative_prompt: {negative_prompt} \n \
-              steps: {steps} \n \
-              cfg_scale: {cfg_scale} \n \
-              width: {width} \n \
-              height: {height} \n \
-              seed: {seed} \n \
-              frames: {frames}")
-        
-        ffmpeg_location = find_ffmpeg_binary()
+                prompt: {prompt} \n \
+                negative_prompt: {negative_prompt} \n \
+                steps: {steps} \n \
+                cfg_scale: {cfg_scale} \n \
+                width: {width} \n \
+                height: {height} \n \
+                seed: {seed} \n \
+                frames: {frames}")
+            
+        try:
+            ffmpeg_location = find_ffmpeg_binary()
 
-        process(prompt=prompt,
-                n_prompt=negative_prompt,
-                steps=steps,
-                frames=frames,
-                seed=seed,
-                cfg_scale=cfg_scale,
-                width=width,
-                height=height,
-                fps=fps,
-                skip_video_creation=False, 
-                ffmpeg_location=ffmpeg_location,
-                ffmpeg_crf='17',
-                ffmpeg_preset='slow',
-                add_soundtrack = 'None',  # ["File","Init Video"]
-                soundtrack_path = "https://deforum.github.io/a1/A1.mp3",
-                eta=0,
-                prompt_v=prompt,
-                n_prompt_v=negative_prompt,
-                steps_v=steps, 
-                frames_v=frames, 
-                seed_v=seed, 
-                cfg_scale_v=cfg_scale, 
-                width_v=width, 
-                height_v=height,
-                eta_v=0)
+            result = process(prompt=prompt,
+                    n_prompt=negative_prompt,
+                    steps=steps,
+                    frames=frames,
+                    seed=seed,
+                    cfg_scale=cfg_scale,
+                    width=width,
+                    height=height,
+                    fps=fps,
+                    skip_video_creation=False, 
+                    ffmpeg_location=ffmpeg_location,
+                    ffmpeg_crf='17',
+                    ffmpeg_preset='slow',
+                    add_soundtrack = 'None',  # ["File","Init Video"]
+                    soundtrack_path = "https://deforum.github.io/a1/A1.mp3",
+                    eta=0,
+                    prompt_v=prompt,
+                    n_prompt_v=negative_prompt,
+                    steps_v=steps, 
+                    frames_v=frames, 
+                    seed_v=seed, 
+                    cfg_scale_v=cfg_scale, 
+                    width_v=width, 
+                    height_v=height,
+                    eta_v=0)
         
-        return {"info": "Success"}
+            print('results', result)
+            
+            return {"info": "Success", "data": {"video_files": result}}
+        except Exception as e:
+            print(e)
+            return {"info": "Error", "data": {"reason": str(e)}}
 
 try:
     import modules.script_callbacks as script_callbacks

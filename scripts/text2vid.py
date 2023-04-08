@@ -88,20 +88,21 @@ def process(skip_video_creation, ffmpeg_location, ffmpeg_crf, ffmpeg_preset, fps
     dataurl = get_error()
     i1_store_t2v = f'<p style=\"font-weight:bold;margin-bottom:0em\">text2video extension for auto1111 — version 1.1b </p><video controls loop><source src="{dataurl}" type="video/mp4"></video>'
     keep_pipe_in_vram = opts.data.get("modelscope_deforum_keep_model_in_vram") if opts.data is not None and opts.data.get("modelscope_deforum_keep_model_in_vram") is not None else False
+    result = []
     try:
         print('text2video — The model selected is: ', model_type)
         if model_type == 'ModelScope':
-            process_modelscope(skip_video_creation, ffmpeg_location, ffmpeg_crf, ffmpeg_preset, fps, add_soundtrack, soundtrack_path, \
-                    prompt, n_prompt, steps, frames, seed, cfg_scale, width, height, eta, \
-                    prompt_v, n_prompt_v, steps_v, frames_v, seed_v, cfg_scale_v, width_v, height_v, eta_v, batch_count_v, \
-                    batch_count, do_img2img, img2img_frames, img2img_frames_path, strength,img2img_startFrame, \
-                    inpainting_image,do_inpainting,inpainting_frames,)
+            result = process_modelscope(skip_video_creation, ffmpeg_location, ffmpeg_crf, ffmpeg_preset, fps, add_soundtrack, soundtrack_path, \
+                        prompt, n_prompt, steps, frames, seed, cfg_scale, width, height, eta, \
+                        prompt_v, n_prompt_v, steps_v, frames_v, seed_v, cfg_scale_v, width_v, height_v, eta_v, batch_count_v, \
+                        batch_count, do_img2img, img2img_frames, img2img_frames_path, strength,img2img_startFrame,
+                        inpainting_image,do_inpainting,inpainting_frames,)
         elif model_type == 'VideoCrafter':
-            process_videocrafter(skip_video_creation, ffmpeg_location, ffmpeg_crf, ffmpeg_preset, fps, add_soundtrack, soundtrack_path, \
-                    prompt, n_prompt, steps, frames, seed, cfg_scale, width, height, eta, \
-                    prompt_v, n_prompt_v, steps_v, frames_v, seed_v, cfg_scale_v, width_v, height_v, eta_v, batch_count_v, \
-                    batch_count, do_img2img, img2img_frames, img2img_frames_path, strength,img2img_startFrame, \
-                    inpainting_image,do_inpainting,inpainting_frames,)
+            result = process_videocrafter(skip_video_creation, ffmpeg_location, ffmpeg_crf, ffmpeg_preset, fps, add_soundtrack, soundtrack_path, \
+                        prompt, n_prompt, steps, frames, seed, cfg_scale, width, height, eta, \
+                        prompt_v, n_prompt_v, steps_v, frames_v, seed_v, cfg_scale_v, width_v, height_v, eta_v, batch_count_v, \
+                        batch_count, do_img2img, img2img_frames, img2img_frames_path, strength,img2img_startFrame,
+                        inpainting_image,do_inpainting,inpainting_frames,)
         else:
             raise NotImplementedError(f"Unknown model type: {model_type}")
     except Exception as e:
@@ -116,7 +117,7 @@ def process(skip_video_creation, ffmpeg_location, ffmpeg_crf, ffmpeg_preset, fps
             pipe = None
         devices.torch_gc()
         gc.collect()
-    return f'Video at ready!'
+    return result
 
 def process_modelscope(skip_video_creation, ffmpeg_location, ffmpeg_crf, ffmpeg_preset, fps, add_soundtrack, soundtrack_path, \
                 prompt, n_prompt, steps, frames, seed, cfg_scale, width, height, eta, \
@@ -276,8 +277,11 @@ def process_modelscope(skip_video_creation, ffmpeg_location, ffmpeg_crf, ffmpeg_
 
     print('Working in txt2vid mode' if not do_img2img else 'Working in vid2vid mode')
 
+    result = []
 
     # Start the batch count loop
+    #samples, _ = pipe.infer(prompt, n_prompt, steps, frames, seed, cfg_scale,
+    #                        width, height, eta, cpu_vae, device, latents,skip_steps=int(math.floor(steps*max(0, min(1 - strength, 1)))))
     pbar = tqdm(range(batch_count), leave=False)
     if batch_count == 1:
         pbar.disable=True
@@ -301,11 +305,14 @@ def process_modelscope(skip_video_creation, ffmpeg_location, ffmpeg_crf, ffmpeg_
             ffmpeg_stitch_video(ffmpeg_location=ffmpeg_location, fps=fps, outmp4_path=outdir_current + os.path.sep + f"vid.mp4", imgs_path=os.path.join(outdir_current,
                                 "%06d.png"), stitch_from_frame=0, stitch_to_frame=-1, add_soundtrack=add_soundtrack, audio_path=img2img_frames_path if add_soundtrack == 'Init Video' else soundtrack_path, crf=ffmpeg_crf, preset=ffmpeg_preset)
         print(f't2v complete, result saved at {outdir_current}')
-
-        mp4 = open(outdir_current + os.path.sep + f"vid.mp4", 'rb').read()
+        output_video_file = outdir_current + os.path.sep + f"vid.mp4"
+        mp4 = open(output_video_file, 'rb').read()
         dataurl = "data:video/mp4;base64," + b64encode(mp4).decode()
         i1_store_t2v = f'<p style=\"font-weight:bold;margin-bottom:0em\">text2video extension for auto1111 — version 1.1b </p><video controls loop><source src="{dataurl}" type="video/mp4"></video>'
+        result.append(output_video_file)
     pbar.close()
+
+    return output_video_file
 
 
 def process_videocrafter(skip_video_creation, ffmpeg_location, ffmpeg_crf, ffmpeg_preset, fps, add_soundtrack, soundtrack_path, \
@@ -359,7 +366,7 @@ def process_videocrafter(skip_video_creation, ffmpeg_location, ffmpeg_crf, ffmpe
     pbar = tqdm(range(batch_count), leave=False)
     if batch_count == 1:
         pbar.disable=True
-    
+    result = []
     for batch in pbar:
         ddim_sampler.noise_gen.manual_seed(seed + batch if seed != -1 else -1)
         # sample
@@ -385,22 +392,25 @@ def process_videocrafter(skip_video_creation, ffmpeg_location, ffmpeg_crf, ffmpe
         # if not skip_video_creation:
         #     ffmpeg_stitch_video(ffmpeg_location=ffmpeg_location, fps=fps, outmp4_path=outdir_current + os.path.sep + f"vid.mp4", imgs_path=os.path.join(outdir_current,
         #                         "%06d.png"), stitch_from_frame=0, stitch_to_frame=-1, add_soundtrack=add_soundtrack, audio_path=img2img_frames_path if add_soundtrack == 'Init Video' else soundtrack_path, crf=ffmpeg_crf, preset=ffmpeg_preset)
-
+        video_file = os.path.join(outdir_current, f"vid.mp4")
         npz_to_video_grid(samples[0:1,...], 
-                              os.path.join(outdir_current, f"vid.mp4"), 
+                              video_file, 
                               fps=fps)
-        add_soundtrack(ffmpeg_location, fps, os.path.join(outdir_current, f"vid.mp4"), 0, -1, None, add_soundtrack, soundtrack_path, ffmpeg_crf, ffmpeg_preset)
+        add_soundtrack(ffmpeg_location, fps, video_file, 0, -1, None, add_soundtrack, soundtrack_path, ffmpeg_crf, ffmpeg_preset)
         print(f't2v complete, result saved at {outdir_current}')
 
-        mp4 = open(outdir_current + os.path.sep + f"vid.mp4", 'rb').read()
+        mp4 = open(video_file, 'rb').read()
         dataurl = "data:video/mp4;base64," + b64encode(mp4).decode()
         i1_store_t2v = f'<p style=\"font-weight:bold;margin-bottom:0em\">text2video extension for auto1111 — version 1.1b </p><video controls loop><source src="{dataurl}" type="video/mp4"></video>'
         print("Finish sampling!")
         print(f"Run time = {(time.time() - start):.2f} seconds")
+        result.append(video_file)
     pbar.close()
 
     # if opt.ddp:
     #     dist.destroy_process_group()
+    
+    return result
 
 
 def setup_common_values(mode):
